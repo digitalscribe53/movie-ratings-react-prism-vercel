@@ -1,0 +1,217 @@
+.movies-section {
+  padding: 0 8px;
+  margin-top: 2rem;
+  background-color: #000000;
+}
+
+.movies-grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+  justify-items: center;
+}
+
+.home-container {
+  padding-top: 4rem;
+  width: 100%;
+  background-color: #000000;
+}
+
+.home-container .container {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.home-container .columns {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  margin: -0.75rem !important;
+}
+
+.home-container .column {
+  padding: 0.75rem;
+  flex: none;
+}
+
+.home-container .is-3-desktop {
+  width: 25% !important; /* This will force 4 columns */
+}
+
+.hero-banner {
+  background-image: url('/images/static/philly-movies-hero-banner.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding: 6rem 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.hero-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.hero-banner .container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 2rem;
+}
+
+.search-form {
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.5rem; 
+  border-radius: 10px;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.field.has-addons {
+  margin: 0;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 60%;
+  gap: 10px;
+}
+
+.field.has-addons .control {
+  margin: 0;
+}
+
+.field.has-addons .control.is-expanded {
+  flex-grow: 1;
+  max-width: 400px;
+}
+
+.search-form .field {
+  width: 100%;
+}
+
+.search-form .input {
+  height: 3rem !important;
+  font-size: 1.2rem !important;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  width: 100%;
+}
+
+.search-form .button {
+  height: 3rem !important;
+  border-top-left-radius: 0px;
+  border-bottom-left-radius: 0px;
+}
+
+.field.has-addons .control .button.is-medium {
+  height: 3rem !important;
+}
+
+.field.has-addons .control .button {
+  width: 60px; /* Set fixed width for both buttons */
+  padding: 0 1rem; /* Consistent padding */
+  height: 2.5rem;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+}
+
+/* Movies Grid */
+.container.mt-4 {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.columns.is-multiline {
+  display: flex !important;
+  flex-wrap: wrap !important;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.columns {
+  display: flex;
+  flex-wrap: wrap;
+  margin: -0.75rem; /* Negative margin to counteract column padding */
+}
+
+.column {
+  padding: 0.75rem;
+  flex: none; /* Prevent columns from growing */
+}
+
+.is-3-desktop {
+  width: 25%; /* Force 4 columns */
+}
+
+.column.is-3-desktop {
+  width: 25% !important;
+  flex: none !important;
+}
+
+@media screen and (max-width: 1023px) {
+  .is-4-tablet {
+    width: 33.33333%;
+  }
+
+
+  .home-container .is-4-tablet {
+    width: 33.33333% !important;
+  }
+
+  .column.is-4-tablet {
+    width: 33.333% !important;
+  }
+
+  .movies-grid-container {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+}
+
+@media screen and (max-width: 950px) {
+  .movies-grid-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+
+@media screen and (max-width: 768px) {
+  .is-6-mobile {
+    width: 50%;
+  }
+  .home-container .is-6-mobile {
+    width: 50% !important;
+  }
+
+  .column.is-6-mobile {
+    width: 50% !important;
+  }
+
+  .movies-grid-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .movie-card {
+    max-width: 160px; /* Smaller cards on mobile */
+  }
+}
