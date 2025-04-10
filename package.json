@@ -12,7 +12,6 @@
     },
     "dependencies": {
       "@apollo/server": "^4.9.5",
-      "@apollo/server-integration-vercel": "^4.0.0",
       "@prisma/client": "^5.7.0",
       "axios": "^1.6.2",
       "bcryptjs": "^2.4.3",
