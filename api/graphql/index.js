@@ -1,5 +1,5 @@
 const { ApolloServer } = require('@apollo/server');
-const { startServerAndCreateHandler } = require('@as-integrations/vercel');
+const { startServerAndCreateHandler } = require('@apollo/server-integration-vercel');
 const { typeDefs } = require('../../server/schema/typeDefs');
 const resolvers = require('../../server/schema/resolvers');
 const prisma = require('../../server/utils/prisma');
