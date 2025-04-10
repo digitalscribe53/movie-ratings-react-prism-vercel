@@ -1,0 +1,75 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  ratings   Rating[]
+  reviews   Review[]
+
+  @@map("user")
+}
+
+model Movie {
+  id            Int      @id @default(autoincrement())
+  title         String
+  description   String
+  releaseYear   Int      @map("release_year")
+  imageSrc      String   @map("image_src")
+  averageRating Float    @default(0) @map("average_rating")
+  tmdbId        Int?     @map("tmdb_id")
+  voteCount     Int      @default(0) @map("vote_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  ratings       Rating[]
+  reviews       Review[]
+
+  @@map("movie")
+}
+
+model Rating {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int      @map("user_id")
+  movie     Movie    @relation(fields: [movieId], references: [id])
+  movieId   Int      @map("movie_id")
+
+  @@map("rating")
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int      @map("user_id")
+  movie     Movie    @relation(fields: [movieId], references: [id])
+  movieId   Int      @map("movie_id")
+
+  @@map("review")
+}
