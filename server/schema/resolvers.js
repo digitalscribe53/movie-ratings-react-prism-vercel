@@ -1,25 +1,30 @@
-const { User, Movie, Rating, Review } = require('../models');
 const { signToken, checkAuth } = require('../utils/auth');
 const { getMovieDetails } = require('../utils/tmdb');
 const tmdbAPI = require('../utils/tmdb');
 const ErrorHandler = require('../utils/errorHandler');
-const { Op } = require('sequelize');
+const bcrypt = require('bcryptjs');
+const prisma = require('../utils/prisma');
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 
 const resolvers = {
   Query: {
-    me: async (_, __, { user }) => {
+    me: async (_, __, { user, prisma }) => {
       if (!user) {
         throw ErrorHandler.unauthorized('Not logged in');
       }
       
       try {
-        const userData = await User.findByPk(user.id, {
-          include: [
-            { model: Rating, include: [Movie] },
-            { model: Review, include: [Movie] }
-          ]
+        const userData = await prisma.user.findUnique({
+          where: { id: user.id },
+          include: {
+            ratings: {
+              include: { movie: true }
+            },
+            reviews: {
+              include: { movie: true }
+            }
+          }
         });
 
         if (!userData) {
@@ -32,13 +37,18 @@ const resolvers = {
       }
     },
 
-    user: async (_, { id }) => {
+    user: async (_, { id }, { prisma }) => {
       try {
-        const userData = await User.findByPk(id, {
-          include: [
-            { model: Rating, include: [Movie] },
-            { model: Review, include: [Movie] }
-          ]
+        const userData = await prisma.user.findUnique({
+          where: { id: parseInt(id) },
+          include: {
+            ratings: {
+              include: { movie: true }
+            },
+            reviews: {
+              include: { movie: true }
+            }
+          }
         });
 
         if (!userData) {
@@ -51,32 +61,36 @@ const resolvers = {
       }
     },
 
-    users: async () => {
+    users: async (_, __, { prisma }) => {
       try {
-        return await User.findAll({
-          include: [
-            { model: Rating },
-            { model: Review }
-          ]
+        return await prisma.user.findMany({
+          include: {
+            ratings: true,
+            reviews: true
+          }
         });
       } catch (error) {
         throw ErrorHandler.databaseError('Error fetching users', error);
       }
     },
 
-    movie: async (_, { id }) => {
+    movie: async (_, { id }, { prisma }) => {
       try {
         // If the id starts with 'tmdb-', it's from a search result
         if (id.startsWith('tmdb-')) {
           const tmdbId = parseInt(id.replace('tmdb-', ''));
           
           // First, try to find the movie by tmdbId
-          let movie = await Movie.findOne({
+          let movie = await prisma.movie.findFirst({
             where: { tmdbId },
-            include: [
-              { model: Rating, include: [User] },
-              { model: Review, include: [User] }
-            ]
+            include: {
+              ratings: {
+                include: { user: true }
+              },
+              reviews: {
+                include: { user: true }
+              }
+            }
           });
     
           // If movie doesn't exist in our database, fetch from TMDB and create it
@@ -86,23 +100,29 @@ const resolvers = {
               throw ErrorHandler.notFound('Movie not found on TMDB');
             }
     
-            movie = await Movie.create({
-              title: movieDetails.title || '',
-              description: movieDetails.overview || '',
-              releaseYear: movieDetails.release_date ? new Date(movieDetails.release_date).getFullYear() : 0,
-              imageSrc: movieDetails.poster_path ? `${IMAGE_BASE_URL}${movieDetails.poster_path}` : '/default-movie-poster.jpg',
-              averageRating: (movieDetails.vote_average / 2) || 0,
-              tmdbId: tmdbId,
-              voteCount: movieDetails.vote_count || 0
+            movie = await prisma.movie.create({
+              data: {
+                title: movieDetails.title || '',
+                description: movieDetails.overview || '',
+                releaseYear: movieDetails.release_date ? new Date(movieDetails.release_date).getFullYear() : 0,
+                imageSrc: movieDetails.poster_path ? `${IMAGE_BASE_URL}${movieDetails.poster_path}` : '/default-movie-poster.jpg',
+                averageRating: (movieDetails.vote_average / 2) || 0,
+                tmdbId: tmdbId,
+                voteCount: movieDetails.vote_count || 0
+              }
             });
     
             // Fetch associations after creation
-            movie = await Movie.findOne({
+            movie = await prisma.movie.findFirst({
               where: { tmdbId },
-              include: [
-                { model: Rating, include: [User] },
-                { model: Review, include: [User] }
-              ]
+              include: {
+                ratings: {
+                  include: { user: true }
+                },
+                reviews: {
+                  include: { user: true }
+                }
+              }
             });
           }
     
@@ -110,11 +130,16 @@ const resolvers = {
         }
     
         // Regular database lookup for seeded movies
-        const movie = await Movie.findByPk(id, {
-          include: [
-            { model: Rating, include: [User] },
-            { model: Review, include: [User] }
-          ]
+        const movie = await prisma.movie.findUnique({
+          where: { id: parseInt(id) },
+          include: {
+            ratings: {
+              include: { user: true }
+            },
+            reviews: {
+              include: { user: true }
+            }
+          }
         });
     
         if (!movie) {
@@ -128,58 +153,44 @@ const resolvers = {
       }
     },
 
-    movies: async (_, { page = 1, limit = 20 }) => {
-      /*try {
-        if (page < 1) {
-          throw ErrorHandler.badRequest('Page number must be greater than 0');
-        }
-
-        const offset = (page - 1) * limit;
-        return await Movie.findAll({
-          limit,
-          offset,
-          order: [['createdAt', 'DESC']],
-          include: [Rating, Review]
-        });
+    movies: async (_, { page = 1, limit = 20 }, { prisma }) => {
+      try {
+        // Fetch popular movies directly from TMDB
+        const popularMovies = await tmdbAPI.getPopularMovies(page);
+        
+        // Map TMDB movies to match our Movie type
+        return popularMovies.map(movie => ({
+          id: `tmdb-${movie.tmdbId}`,
+          title: movie.title,
+          description: movie.description,
+          releaseYear: movie.releaseYear,
+          imageSrc: movie.imageSrc,
+          averageRating: movie.averageRating,
+          tmdbId: movie.tmdbId,
+          voteCount: movie.voteCount
+        }));
       } catch (error) {
-        throw ErrorHandler.databaseError('Error fetching movies', error);
+        throw ErrorHandler.tmdbError('Error fetching popular movies', error);
       }
-    },*/
-    try {
-      // Fetch popular movies directly from TMDB
-      const popularMovies = await tmdbAPI.getPopularMovies(page);
-      
-      // Map TMDB movies to match our Movie type
-      return popularMovies.map(movie => ({
-        id: `tmdb-${movie.tmdbId}`,
-        title: movie.title,
-        description: movie.description,
-        releaseYear: movie.releaseYear,
-        imageSrc: movie.imageSrc,
-        averageRating: movie.averageRating,
-        tmdbId: movie.tmdbId,
-        voteCount: movie.voteCount
-      }));
-    } catch (error) {
-      throw ErrorHandler.tmdbError('Error fetching popular movies', error);
-    }
-  },
+    },
 
-
-
-    moviesByTitle: async (_, { title }) => {
+    moviesByTitle: async (_, { title }, { prisma }) => {
       if (!title.trim()) {
         throw ErrorHandler.badRequest('Search title cannot be empty');
       }
 
       try {
-        return await Movie.findAll({
+        return await prisma.movie.findMany({
           where: {
             title: {
-              [Op.iLike]: `%${title}%`
+              contains: title,
+              mode: 'insensitive'
             }
           },
-          include: [Rating, Review]
+          include: {
+            ratings: true,
+            reviews: true
+          }
         });
       } catch (error) {
         throw ErrorHandler.databaseError('Error searching movies', error);
@@ -237,64 +248,83 @@ const resolvers = {
   },
 
   User: {
-    ratings: async (parent, { page = 1 }, context) => {
+    ratings: async (parent, { page = 1 }, { prisma }) => {
       const limit = 12; // Number of ratings per page
-      const offset = (page - 1) * limit;
+      const skip = (page - 1) * limit;
 
-      const ratings = await Rating.findAndCountAll({
-        where: { userId: parent.id },
-        limit,
-        offset,
-        include: [
-          {
-            model: Movie,
-            attributes: ['id', 'title', 'imageSrc']
-          }
-        ],
-        order: [['createdAt', 'DESC']]
-      });
+      const [ratings, totalCount] = await Promise.all([
+        prisma.rating.findMany({
+          where: { userId: parent.id },
+          skip,
+          take: limit,
+          include: {
+            movie: {
+              select: {
+                id: true,
+                title: true,
+                imageSrc: true
+              }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        }),
+        prisma.rating.count({
+          where: { userId: parent.id }
+        })
+      ]);
 
       return {
-        items: ratings.rows,
-        totalPages: Math.ceil(ratings.count / limit),
+        items: ratings,
+        totalPages: Math.ceil(totalCount / limit),
         currentPage: page
       };
     },
 
-    reviews: async (parent, { page = 1 }, context) => {
+    reviews: async (parent, { page = 1 }, { prisma }) => {
       const limit = 10; // Number of reviews per page
-      const offset = (page - 1) * limit;
+      const skip = (page - 1) * limit;
 
-      const reviews = await Review.findAndCountAll({
-        where: { userId: parent.id },
-        limit,
-        offset,
-        include: [
-          {
-            model: Movie,
-            attributes: ['id', 'title', 'imageSrc']
-          }
-        ],
-        order: [['createdAt', 'DESC']]
-      });
+      const [reviews, totalCount] = await Promise.all([
+        prisma.review.findMany({
+          where: { userId: parent.id },
+          skip,
+          take: limit,
+          include: {
+            movie: {
+              select: {
+                id: true,
+                title: true,
+                imageSrc: true
+              }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        }),
+        prisma.review.count({
+          where: { userId: parent.id }
+        })
+      ]);
 
       return {
-        items: reviews.rows,
-        totalPages: Math.ceil(reviews.count / limit),
+        items: reviews,
+        totalPages: Math.ceil(totalCount / limit),
         currentPage: page
       };
     }
   },
 
   Mutation: {
-    login: async (_, { username, password }) => {
+    login: async (_, { username, password }, { prisma }) => {
       try {
-        const user = await User.findOne({ where: { username } });
+        const user = await prisma.user.findUnique({ 
+          where: { username } 
+        });
+        
         if (!user) {
           throw ErrorHandler.unauthorized('Invalid credentials');
         }
 
-        const correctPw = await user.checkPassword(password);
+        const correctPw = await bcrypt.compare(password, user.password);
         if (!correctPw) {
           throw ErrorHandler.unauthorized('Invalid credentials');
         }
@@ -307,7 +337,7 @@ const resolvers = {
       }
     },
 
-    addUser: async (_, args) => {
+    addUser: async (_, args, { prisma }) => {
       try {
         if (!args.username || !args.password) {
           throw ErrorHandler.validationError('Username and password are required');
@@ -317,12 +347,23 @@ const resolvers = {
           throw ErrorHandler.validationError('Password must be at least 6 characters');
         }
 
-        const existingUser = await User.findOne({ where: { username: args.username } });
+        const existingUser = await prisma.user.findUnique({ 
+          where: { username: args.username } 
+        });
+        
         if (existingUser) {
           throw ErrorHandler.validationError('Username already exists');
         }
 
-        const user = await User.create(args);
+        const hashedPassword = await bcrypt.hash(args.password, 10);
+        
+        const user = await prisma.user.create({
+          data: {
+            ...args,
+            password: hashedPassword
+          }
+        });
+        
         const token = signToken(user);
         return { token, user };
       } catch (error) {
@@ -331,25 +372,30 @@ const resolvers = {
       }
     },
 
-    addMovie: async (_, args, { user }) => {
+    addMovie: async (_, args, { user, prisma }) => {
       if (!user?.isAdmin) {
         throw ErrorHandler.forbidden('Must be an admin to add movies');
       }
 
       try {
-        const existingMovie = await Movie.findOne({ where: { title: args.title } });
+        const existingMovie = await prisma.movie.findFirst({ 
+          where: { title: args.title } 
+        });
+        
         if (existingMovie) {
           throw ErrorHandler.validationError('Movie already exists');
         }
 
-        return await Movie.create(args);
+        return await prisma.movie.create({
+          data: args
+        });
       } catch (error) {
         if (error.extensions?.code) throw error;
         throw ErrorHandler.databaseError('Error adding movie', error);
       }
     },
 
-    addRating: async (_, { movieId, rating }, { user }) => {
+    addRating: async (_, { movieId, rating }, { user, prisma }) => {
       if (!user) {
         throw ErrorHandler.unauthorized('Must be logged in to rate movies');
       }
@@ -359,25 +405,54 @@ const resolvers = {
       }
 
       try {
-        const movie = await Movie.findByPk(movieId);
+        const movie = await prisma.movie.findUnique({
+          where: { id: parseInt(movieId) }
+        });
+        
         if (!movie) {
           throw ErrorHandler.notFound('Movie not found');
         }
 
-        const [ratingRecord, created] = await Rating.findOrCreate({
-          where: { userId: user.id, movieId },
-          defaults: { rating }
+        // Check if rating already exists
+        const existingRating = await prisma.rating.findFirst({
+          where: {
+            userId: user.id,
+            movieId: parseInt(movieId)
+          }
         });
 
-        if (!created) {
-          await ratingRecord.update({ rating });
+        let ratingRecord;
+        if (existingRating) {
+          // Update existing rating
+          ratingRecord = await prisma.rating.update({
+            where: { id: existingRating.id },
+            data: { rating }
+          });
+        } else {
+          // Create new rating
+          ratingRecord = await prisma.rating.create({
+            data: {
+              rating,
+              userId: user.id,
+              movieId: parseInt(movieId)
+            }
+          });
         }
 
-        const ratings = await Rating.findAll({ where: { movieId } });
+        // Calculate new average rating
+        const ratings = await prisma.rating.findMany({
+          where: { movieId: parseInt(movieId) }
+        });
+        
         const avgRating = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
-        await movie.update({
-          averageRating: avgRating,
-          voteCount: ratings.length
+        
+        // Update movie with new average and vote count
+        await prisma.movie.update({
+          where: { id: parseInt(movieId) },
+          data: {
+            averageRating: avgRating,
+            voteCount: ratings.length
+          }
         });
 
         return ratingRecord;
@@ -386,7 +461,7 @@ const resolvers = {
       }
     },
 
-    addReview: async (_, { movieId, content }, { user }) => {
+    addReview: async (_, { movieId, content }, { user, prisma }) => {
       if (!user) {
         throw ErrorHandler.unauthorized('Must be logged in to review movies');
       }
@@ -396,22 +471,27 @@ const resolvers = {
       }
 
       try {
-        const movie = await Movie.findByPk(movieId);
+        const movie = await prisma.movie.findUnique({
+          where: { id: parseInt(movieId) }
+        });
+        
         if (!movie) {
           throw ErrorHandler.notFound('Movie not found');
         }
 
-        return await Review.create({
-          movieId,
-          userId: user.id,
-          content
+        return await prisma.review.create({
+          data: {
+            content,
+            userId: user.id,
+            movieId: parseInt(movieId)
+          }
         });
       } catch (error) {
         throw ErrorHandler.databaseError('Error adding review', error);
       }
     },
 
-    updateReview: async (_, { reviewId, content }, { user }) => {
+    updateReview: async (_, { reviewId, content }, { user, prisma }) => {
       if (!user) {
         throw ErrorHandler.unauthorized('Must be logged in to update reviews');
       }
@@ -421,7 +501,10 @@ const resolvers = {
       }
 
       try {
-        const review = await Review.findByPk(reviewId);
+        const review = await prisma.review.findUnique({
+          where: { id: parseInt(reviewId) }
+        });
+        
         if (!review) {
           throw ErrorHandler.notFound('Review not found');
         }
@@ -430,21 +513,26 @@ const resolvers = {
           throw ErrorHandler.forbidden('Cannot update another user\'s review');
         }
 
-        await review.update({ content });
-        return review;
+        return await prisma.review.update({
+          where: { id: parseInt(reviewId) },
+          data: { content }
+        });
       } catch (error) {
         if (error.extensions?.code) throw error;
         throw ErrorHandler.databaseError('Error updating review', error);
       }
     },
 
-    deleteReview: async (_, { reviewId }, { user }) => {
+    deleteReview: async (_, { reviewId }, { user, prisma }) => {
       if (!user) {
         throw ErrorHandler.unauthorized('Must be logged in to delete reviews');
       }
 
       try {
-        const review = await Review.findByPk(reviewId);
+        const review = await prisma.review.findUnique({
+          where: { id: parseInt(reviewId) }
+        });
+        
         if (!review) {
           throw ErrorHandler.notFound('Review not found');
         }
@@ -453,7 +541,10 @@ const resolvers = {
           throw ErrorHandler.forbidden('Cannot delete another user\'s review');
         }
 
-        await review.destroy();
+        await prisma.review.delete({
+          where: { id: parseInt(reviewId) }
+        });
+        
         return true;
       } catch (error) {
         if (error.extensions?.code) throw error;
