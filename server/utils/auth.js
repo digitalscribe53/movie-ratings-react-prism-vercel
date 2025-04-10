@@ -1,64 +1,73 @@
-// server/utils/auth.js
 const jwt = require('jsonwebtoken');
-const { AuthenticationError } = require('@apollo/server');
+const { GraphQLError } = require('graphql');
 require('dotenv').config();
 
-const PUBLIC_OPERATIONS = [
-  'GetMovie',
-  'movie',
-  'GetMovies',
-  'SearchMovies',
-  'GetPopularMovies',
-  'tmdbMovieDetails'
-];
+const secret = process.env.JWT_SECRET || 'mysecretsshhhhh';
+const expiration = '2h';
 
-const signToken = ({ username, id, isAdmin }) => {
-  return jwt.sign({ username, id, isAdmin }, process.env.JWT_SECRET, {
-    expiresIn: '2h',
-  });
-};
+module.exports = {
+  // Generate JWT token
+  signToken: function ({ id, username, isAdmin }) {
+    const payload = { id, username, isAdmin };
+    return jwt.sign({ data: payload }, secret, { expiresIn: expiration });
+  },
 
-const authMiddleware = async ({ req }) => {
-  const operationName = req.body?.operationName;
+  // Verify JWT token and get user data
+  checkAuth: function (context) {
+    // Get the authorization header
+    const authHeader = context.req.headers.authorization;
 
-  if (PUBLIC_OPERATIONS.includes(operationName)) {
-    return req;
-  }
+    // Check if token exists
+    if (!authHeader) {
+      return null;
+    }
 
-  let token = req.body?.token || req.query?.token || req.headers?.authorization;
+    // Format should be "Bearer [token]"
+    const token = authHeader.split(' ').pop().trim();
+    if (!token) {
+      return null;
+    }
 
-  if (req.headers?.authorization) {
-    token = token.split(' ').pop().trim();
-  }
+    try {
+      // Verify token
+      const { data } = jwt.verify(token, secret);
+      return data;
+    } catch (err) {
+      console.error('Invalid token:', err.message);
+      return null;
+    }
+  },
 
-  if (!token) {
-    return req;
-  }
+  // Express middleware for auth
+  authMiddleware: function ({ req }) {
+    // Get the authorization header
+    const authHeader = req.headers.authorization;
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-  } catch (error) {
-    console.log('Invalid token');
-  }
+    // Check if token exists
+    if (!authHeader) {
+      return { user: null };
+    }
 
-  return req;
-};
+    // Format should be "Bearer [token]"
+    const token = authHeader.split(' ').pop().trim();
+    if (!token) {
+      return { user: null };
+    }
 
-const checkAuth = (context, operationType) => {
-  if (PUBLIC_OPERATIONS.includes(operationType)) {
-    return context.user || null;
-  }
-  
-  if (!context.user) {
-    throw new AuthenticationError('You need to be logged in!');
-  }
-  
-  return context.user;
-};
+    try {
+      // Verify token
+      const { data } = jwt.verify(token, secret);
+      return { user: data };
+    } catch (err) {
+      console.error('Invalid token:', err.message);
+      return { user: null };
+    }
+  },
 
-module.exports = { 
-  signToken, 
-  authMiddleware, 
-  checkAuth 
+  // Authentication error for GraphQL
+  AuthenticationError: new GraphQLError('You must be logged in to perform this action.', {
+    extensions: {
+      code: 'UNAUTHENTICATED',
+    },
+  }),
 };
