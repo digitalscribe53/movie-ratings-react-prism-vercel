@@ -1,21 +1,10 @@
 const { ApolloServer } = require('@apollo/server');
 const { startServerAndCreateHandler } = require('@as-integrations/vercel');
-const { typeDefs, resolvers } = require('../../server/schema');
+const { typeDefs } = require('../../server/schema/typeDefs');
+const resolvers = require('../../server/schema/resolvers');
 const prisma = require('../../server/utils/prisma');
-const jwt = require('jsonwebtoken');
+const { checkAuth } = require('../../server/utils/auth');
 require('dotenv').config();
-
-// Authentication function
-const getUser = (token) => {
-  if (token) {
-    try {
-      return jwt.verify(token, process.env.JWT_SECRET);
-    } catch (error) {
-      return null;
-    }
-  }
-  return null;
-};
 
 // Create the Apollo Server
 const server = new ApolloServer({
@@ -23,16 +12,24 @@ const server = new ApolloServer({
   resolvers,
   introspection: true, // Enable introspection in all environments
   cache: 'bounded',
+  formatError: (error) => {
+    console.error('GraphQL error:', error);
+    
+    // Return custom error format
+    return {
+      message: error.message,
+      locations: error.locations,
+      path: error.path,
+      extensions: error.extensions,
+    };
+  },
 });
 
 // Create and export the handler
 module.exports = startServerAndCreateHandler(server, {
   context: async ({ req }) => {
-    // Get the token from the request headers
-    const token = req.headers.authorization?.split(' ')[1] || '';
-    
-    // Add user to the context if token is valid
-    const user = getUser(token);
+    // Get user from token
+    const user = checkAuth({ req });
     
     // Return the context object
     return {
