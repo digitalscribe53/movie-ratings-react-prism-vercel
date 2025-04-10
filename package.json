@@ -1,0 +1,31 @@
+{
+    "name": "movie-ratings-app",
+    "version": "1.0.0",
+    "description": "Movie ratings application",
+    "main": "index.js",
+    "scripts": {
+      "start": "node api/graphql/index.js",
+      "dev": "vercel dev",
+      "build": "cd client && npm install && npm run build",
+      "seed": "cd server && npx prisma db seed",
+      "postinstall": "prisma generate"
+    },
+    "dependencies": {
+      "@apollo/server": "^4.9.5",
+      "@as-integrations/vercel": "^3.0.0",
+      "@prisma/client": "^5.7.0",
+      "axios": "^1.6.2",
+      "bcryptjs": "^2.4.3",
+      "dotenv": "^16.3.1",
+      "graphql": "^16.8.1",
+      "jsonwebtoken": "^9.0.2"
+    },
+    "devDependencies": {
+      "prisma": "^5.7.0",
+      "vercel": "^32.5.6"
+    },
+    "prisma": {
+      "seed": "node seeds/seed.js",
+      "schema": "./server/prisma/schema.prisma"
+    }
+  }
