@@ -8,7 +8,8 @@
       "dev": "vercel dev",
       "build": "cd client && npm install && npm run build",
       "seed": "cd server && npx prisma db seed",
-      "postinstall": "prisma generate"
+      "postinstall": "prisma generate",
+      "deploy:prisma": "node scripts/deploy.js"
     },
     "dependencies": {
       "@apollo/server": "^4.9.5",
