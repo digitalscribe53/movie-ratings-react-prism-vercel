@@ -1,18 +1,5 @@
 {
     "version": 2,
-    "buildCommand": "npx prisma generate && cd client && npm install --include=dev && npm run build",
-    "outputDirectory": "client/dist",
-    "routes": [
-      {
-        "src": "/api/(.*)",
-        "dest": "/api/$1.js"
-      },
-      {
-        "handle": "filesystem"
-      },
-      {
-        "src": "/(.*)",
-        "dest": "/client/dist/index.html"
-      }
-    ]
+    "buildCommand": "cd client && npm install --include=dev && npm run build",
+    "outputDirectory": "client/dist"
   }
