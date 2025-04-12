@@ -5,7 +5,7 @@
     "routes": [
       {
         "src": "/api/(.*)",
-        "dest": "/api/$1"
+        "dest": "/api/$1.js"
       },
       {
         "handle": "filesystem"
@@ -14,8 +14,5 @@
         "src": "/(.*)",
         "dest": "/client/dist/index.html"
       }
-    ],
-    "env": {
-      "NODE_ENV": "production"
-    }
+    ]
   }
