@@ -1,6 +1,6 @@
 {
     "version": 2,
-    "buildCommand": false,
+    "buildCommand": null,
     "outputDirectory": "client/dist",
     "routes": [
       { "src": "/api/(.*)", "dest": "/api/$1" },
