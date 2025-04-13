@@ -1,9 +1,9 @@
 {
     "version": 2,
     "buildCommand": null,
-    "outputDirectory": "client/dist",
+    "outputDirectory": "public",
     "routes": [
       { "src": "/api/(.*)", "dest": "/api/$1" },
-      { "src": "/(.*)", "dest": "/client/dist/index.html" }
+      { "src": "/(.*)", "dest": "/public/index.html" }
     ]
   }
