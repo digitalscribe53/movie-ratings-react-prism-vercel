@@ -5,7 +5,7 @@
     "main": "index.js",
     "scripts": {
       "start": "node api/graphql/index.js",
-      "dev": "vercel dev",
+      "dev": "cd client && npm run dev",
       "build": "cd client && npm install && npm run build",
       "seed": "cd server && npx prisma db seed",
       "postinstall": "prisma generate",
